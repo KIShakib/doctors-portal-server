@@ -71,6 +71,16 @@ async function dataBase() {
             res.send(result);
         })
 
+        // Specific User Booking By Their Email
+        app.get("/myappointments", async (req, res) => {
+            const email = req.query.email;
+            const query = {
+                email: email
+            }
+            const booking = await bookingsCollection.find(query).toArray();
+            res.send(booking);
+        })
+
 
 
     }
