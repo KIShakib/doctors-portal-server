@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 require("colors");
 require("dotenv").config();
+const jwt = require("jsonwebtoken");
 const { MongoClient, ServerApiVersion } = require('mongodb');
 const app = express();
 const port = process.env.PORT || 5000;
@@ -23,11 +24,31 @@ app.get("/", (req, res) => {
 })
 
 
+
+function verifyJWT(req, res, next) {
+    // const token = req.headers.authorization;
+    // console.log(token);
+    const authHeader = req.headers.authorization
+    if (!authHeader) {
+        return res.status(401).send("UnAuthorized Access")
+    }
+    const token = authHeader.split(" ")[1];
+    jwt.verify(token, process.env.ACCESS_TOKEN, function (err, decoded) {
+        if (err) {
+            res.status(403).send({ message: "Forbidden" })
+        }
+        req.decoded = decoded;
+        next();
+    })
+}
+
+
 async function dataBase() {
     try {
 
         const appointmentOptionsCollection = client.db("doctors-portal").collection("appointmentOptions");
         const bookingsCollection = client.db("doctors-portal").collection("bookings");
+        const usersCollection = client.db("doctors-portal").collection("users");
 
 
         // All Appointment Option 
@@ -66,14 +87,17 @@ async function dataBase() {
                 return res.send({ acknowledge: false, message })
             }
 
-
             const result = await bookingsCollection.insertOne(booking);
             res.send(result);
         })
 
         // Specific User Booking By Their Email
-        app.get("/myappointments", async (req, res) => {
+        app.get("/myappointments", verifyJWT, async (req, res) => {
             const email = req.query.email;
+            const decodedEmail = req.decoded.email;
+            if (email !== decodedEmail) {
+                return res.status(403).send({ message: "Forbidden" })
+            }
             const query = {
                 email: email
             }
@@ -81,6 +105,35 @@ async function dataBase() {
             res.send(booking);
         })
 
+
+        // JWT
+        app.get("/jwt", async (req, res) => {
+            const email = req.query.email;
+            const query = { email: email };
+            const user = await usersCollection.findOne(query);
+            if (user) {
+                const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, { expiresIn: "24h" })
+                res.send({ accessToken: token })
+            }
+            res.status(403).send({ message: "Forbidden" })
+        })
+
+
+        // Store Users In DataBase
+        app.post("/user", async (req, res) => {
+            const user = req.body;
+            const result = await usersCollection.insertOne(user);
+            res.send(result);
+        })
+
+
+
+        // All Users Send
+        app.get("/allusers", async (req, res) => {
+            const query = {};
+            const users = await usersCollection.find(query).toArray();
+            res.send(users);
+        })
 
 
     }
