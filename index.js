@@ -3,7 +3,7 @@ const cors = require('cors');
 require("colors");
 require("dotenv").config();
 const jwt = require("jsonwebtoken");
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const app = express();
 const port = process.env.PORT || 5000;
 
@@ -35,7 +35,7 @@ function verifyJWT(req, res, next) {
     const token = authHeader.split(" ")[1];
     jwt.verify(token, process.env.ACCESS_TOKEN, function (err, decoded) {
         if (err) {
-            res.status(403).send({ message: "Forbidden" })
+            return res.status(403).send({ message: "Forbidden" })
         }
         req.decoded = decoded;
         next();
@@ -77,7 +77,9 @@ async function dataBase() {
             const booking = req.body;
 
             const query = {
-                date: booking.date
+                date: booking.date,
+                treatmentName: booking.treatmentName,
+                email: booking.email
             }
 
             const booked = await bookingsCollection.find(query).toArray();
@@ -106,6 +108,16 @@ async function dataBase() {
         })
 
 
+        // Specific Users Remove Booking
+        app.delete("/delete/:id", async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: ObjectId(id) }
+
+            const result = await bookingsCollection.deleteOne(query);
+            res.send(result);
+        })
+
+
         // JWT
         app.get("/jwt", async (req, res) => {
             const email = req.query.email;
@@ -113,9 +125,18 @@ async function dataBase() {
             const user = await usersCollection.findOne(query);
             if (user) {
                 const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, { expiresIn: "24h" })
-                res.send({ accessToken: token })
+                return res.send({ accessToken: token })
             }
             res.status(403).send({ message: "Forbidden" })
+        })
+
+
+        // Load Specific User By Email
+        app.get("/user/admin/:email", async (req, res) => {
+            const email = req.params.email;
+            const query = { email: email };
+            const user = await usersCollection.findOne(query);
+            res.send({ isAdmin: user?.role === "Admin" })
         })
 
 
@@ -128,11 +149,36 @@ async function dataBase() {
 
 
 
+
+
         // All Users Send
         app.get("/allusers", async (req, res) => {
             const query = {};
             const users = await usersCollection.find(query).toArray();
             res.send(users);
+        })
+
+
+        // Change User Role
+        app.put("/user/admin/:id", verifyJWT, async (req, res) => {
+            const decodedEmail = req.decoded.email;
+            const query = { email: decodedEmail };
+            const stepTakenUser = await usersCollection.findOne(query);
+            if (stepTakenUser?.role !== "Admin") {
+                return res.status(403).send({ message: "You Can't Take Action." })
+            }
+
+
+            const id = req.params.id;
+            const filter = { _id: ObjectId(id) };
+            const options = { upsert: true };
+            const updateDoc = {
+                $set: {
+                    role: "Admin"
+                }
+            }
+            const result = await usersCollection.updateOne(filter, updateDoc, options);
+            res.send(result);
         })
 
 
