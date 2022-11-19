@@ -52,6 +52,19 @@ async function dataBase() {
         const doctorsCollection = client.db("doctors-portal").collection("doctors");
 
 
+        // Verify Admin Middleware
+
+        const verifyAdmin = async (req, res, next) => {
+            const decodedEmail = req.decoded.email;
+            const query = { email: decodedEmail };
+            const stepTakenUser = await usersCollection.findOne(query);
+            if (stepTakenUser?.role !== "Admin") {
+                return res.status(403).send({ message: "You Can't Take Action." })
+            }
+            next();
+        }
+
+
         // All Appointment Option 
         app.get("/appointmentOptions", async (req, res) => {
             const query = {};
@@ -72,6 +85,7 @@ async function dataBase() {
             })
             res.send(appointmentOptions)
         })
+
 
         // Add Booking To Database
         app.post("/booking", async (req, res) => {
@@ -161,14 +175,7 @@ async function dataBase() {
 
 
         // Change User Role
-        app.put("/user/admin/:id", verifyJWT, async (req, res) => {
-            const decodedEmail = req.decoded.email;
-            const query = { email: decodedEmail };
-            const stepTakenUser = await usersCollection.findOne(query);
-            if (stepTakenUser?.role !== "Admin") {
-                return res.status(403).send({ message: "You Can't Take Action." })
-            }
-
+        app.put("/user/admin/:id", verifyJWT, verifyAdmin, async (req, res) => {
 
             const id = req.params.id;
             const filter = { _id: ObjectId(id) };
@@ -184,7 +191,7 @@ async function dataBase() {
 
 
         // Only Treatment Name
-        app.get("/appointment-name", async (req, res) => {
+        app.get("/appointment-name", verifyJWT, verifyAdmin, async (req, res) => {
             const query = {};
             const result = await appointmentOptionsCollection.find(query).project({ name: 1 }).toArray();
             res.send(result)
@@ -192,18 +199,26 @@ async function dataBase() {
 
 
         // Add Doctor To DB
-        app.post("/add-doctor", async (req, res) => {
+        app.post("/add-doctor", verifyJWT, verifyAdmin, async (req, res) => {
             const doctor = req.body;
             const result = await doctorsCollection.insertOne(doctor);
             res.send(result)
         })
 
         // Send All Doctors
-        app.get("/doctors", async (req, res) => {
+        app.get("/doctors", verifyJWT, verifyAdmin, async (req, res) => {
             const query = {};
             const doctors = await doctorsCollection.find(query).toArray();
             res.send(doctors);
         })
+
+        // Delete A Doctor By ID
+        app.delete("/delete-doctors/:id", verifyJWT, verifyAdmin, async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: ObjectId(id) };
+            const result = await doctorsCollection.deleteOne(filter);
+            res.send(result);
+        });
 
 
     }
