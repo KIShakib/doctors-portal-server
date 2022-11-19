@@ -49,6 +49,7 @@ async function dataBase() {
         const appointmentOptionsCollection = client.db("doctors-portal").collection("appointmentOptions");
         const bookingsCollection = client.db("doctors-portal").collection("bookings");
         const usersCollection = client.db("doctors-portal").collection("users");
+        const doctorsCollection = client.db("doctors-portal").collection("doctors");
 
 
         // All Appointment Option 
@@ -179,6 +180,29 @@ async function dataBase() {
             }
             const result = await usersCollection.updateOne(filter, updateDoc, options);
             res.send(result);
+        })
+
+
+        // Only Treatment Name
+        app.get("/appointment-name", async (req, res) => {
+            const query = {};
+            const result = await appointmentOptionsCollection.find(query).project({ name: 1 }).toArray();
+            res.send(result)
+        })
+
+
+        // Add Doctor To DB
+        app.post("/add-doctor", async (req, res) => {
+            const doctor = req.body;
+            const result = await doctorsCollection.insertOne(doctor);
+            res.send(result)
+        })
+
+        // Send All Doctors
+        app.get("/doctors", async (req, res) => {
+            const query = {};
+            const doctors = await doctorsCollection.find(query).toArray();
+            res.send(doctors);
         })
 
 
