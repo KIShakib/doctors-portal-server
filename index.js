@@ -21,7 +21,7 @@ const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology:
 
 // API
 app.get("/", (req, res) => {
-    res.send("Doctors Portal Server Is Running...")
+    res.send("Doctors Portal Live Server Is Running Now...")
 })
 
 
